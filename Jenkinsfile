@@ -1,32 +1,31 @@
 pipeline {
     agent any
 
-    environment {
-        APP_NAME = 'apachewebsite'
-        SERVER_IP = '35.154.226.86' // Apache web server IP
-        DEPLOY_DIR = '/var/www/html' // Path where the website files will be deployed on the server
-    }
-
     stages {
-        stage('Checkout Code') {
+        stage('Clone Repository') {
             steps {
-                // Checkout the code from GitHub repository
-                git 'https://github.com/ltryash/apachewebsite'
+                git 'https://github.com/ltryash/apachewebsite.git'
             }
         }
 
-        stage('Deploy') {
+        stage('Deploy to Apache Server') {
             steps {
-                echo 'Deploying application to Apache server...'
-                // Deploy the application to Apache web server using SSH
-                sshagent(['sshkey']) {  // Use Jenkins credential ID
+                script {
+                    // Ensure /var/www/html exists and clear old files
                     sh '''
-                        ssh -o StrictHostKeyChecking=no user@$SERVER_IP << 'EOF'
-                        rm -rf $DEPLOY_DIR/*  # Remove old files
-                        cp -r * $DEPLOY_DIR/   # Copy new files
-                        sudo systemctl restart apache2  # Restart Apache to apply changes
-                        EOF
+                    sudo rm -rf /var/www/html/*
+                    sudo cp -r * /var/www/html/
+                    sudo chown -R www-data:www-data /var/www/html/
+                    sudo chmod -R 755 /var/www/html/
                     '''
+                }
+            }
+        }
+
+        stage('Restart Apache') {
+            steps {
+                script {
+                    sh 'sudo systemctl restart apache2'
                 }
             }
         }
@@ -34,10 +33,10 @@ pipeline {
 
     post {
         success {
-            echo 'Deployment successful!'
+            echo 'Deployment Successful! Website is live on Apache.'
         }
         failure {
-            echo 'Deployment failed!'
+            echo 'Deployment Failed! Check the logs for errors.'
         }
     }
 }
